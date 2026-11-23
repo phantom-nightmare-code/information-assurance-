@@ -4,6 +4,11 @@ import './App.css';
 
 const API_URL = 'http://localhost:5000/api/products';
 
+const ACCOUNTS = {
+  james: { name: 'James', fullName: 'James D.', initials: 'JD', role: 'Administrator' },
+  muriel: { name: 'Muriel', fullName: 'Muriel', initials: 'MU', role: 'Inventory Manager' },
+};
+
 function App() {
   const [page, setPage] = useState('home');
   const [products, setProducts] = useState([]);
@@ -11,6 +16,13 @@ function App() {
   const [search, setSearch] = useState('');
   const [formData, setFormData] = useState({ name: '', quantity: '', price: '' });
   const [editId, setEditId] = useState(null);
+  const [accountKey, setAccountKey] = useState(() => {
+    const saved = localStorage.getItem('stockflow-account');
+    return saved === 'muriel' ? 'muriel' : 'james';
+  });
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
+  const currentAccount = ACCOUNTS[accountKey];
 
   const fetchProducts = async () => {
     try {
@@ -116,11 +128,34 @@ function App() {
           </button>
         </nav>
 
+        <div className="account-switcher">
+          <button className="account-button" onClick={() => setAccountMenuOpen(!accountMenuOpen)}>
+            <span className="account-initials">{currentAccount.initials}</span>
+            <span className="account-name">{currentAccount.name}</span>
+            <span className="arrow">{accountMenuOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {accountMenuOpen && (
+            <div className="account-menu">
+              {Object.entries(ACCOUNTS).map(([key, account]) => (
+                <button
+                  key={key}
+                  className={`account-option ${accountKey === key ? 'active' : ''}`}
+                  onClick={() => switchAccount(key)}
+                >
+                  <span className="account-initials">{account.initials}</span>
+                  <span className="account-name">{account.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="sidebar-footer">
-          <div className="avatar">JD</div>
+          <div className="avatar">{currentAccount.initials}</div>
           <div>
-            <strong>James D.</strong>
-            <span>Administrator</span>
+            <strong>{currentAccount.fullName}</strong>
+            <span>{currentAccount.role}</span>
           </div>
         </div>
       </aside>
@@ -131,7 +166,7 @@ function App() {
             <div className="page-heading">
               <div>
                 <p className="eyebrow">DASHBOARD</p>
-                <h1>Welcome back, James</h1>
+                <h1>Welcome back, {currentAccount.name}</h1>
                 <p className="subtitle">Here’s what’s happening with your inventory today.</p>
               </div>
               <button className="primary-button" onClick={() => setPage('products')}>
