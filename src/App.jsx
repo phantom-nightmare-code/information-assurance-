@@ -111,6 +111,12 @@ function App() {
     product.name.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const switchAccount = (key) => {
+    setAccountKey(key);
+    localStorage.setItem('stockflow-account', key);
+    setAccountMenuOpen(false);
+  };
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
