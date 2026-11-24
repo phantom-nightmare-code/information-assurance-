@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
-const API_URL = 'http://localhost:5000/api/products';
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products`;
 
 const ACCOUNTS = {
   james: { name: 'James', fullName: 'James D.', initials: 'JD', role: 'Administrator' },
@@ -10,10 +10,12 @@ const ACCOUNTS = {
 };
 
 function App() {
-  const [page, setPage] = useState('home');
+  const [page, setPage] = useState('landing');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({ name: '', quantity: '', price: '' });
   const [editId, setEditId] = useState(null);
   const [accountKey, setAccountKey] = useState(() => {
@@ -27,10 +29,12 @@ function App() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
+      setError('');
       const response = await axios.get(API_URL);
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
+      setError('Could not connect to the backend. Start the server and try again.');
     } finally {
       setLoading(false);
     }
@@ -49,7 +53,10 @@ function App() {
       })
       .catch((error) => {
         console.error('Error fetching products:', error);
-        if (!ignore) setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+          setError('Could not connect to the backend. Start the server and try again.');
+        }
       });
 
     return () => {
@@ -64,14 +71,18 @@ function App() {
       if (editId) {
         await axios.put(`${API_URL}/${editId}`, formData);
         setEditId(null);
+        setNotice('Product updated successfully.');
       } else {
         await axios.post(API_URL, formData);
+        setNotice('Product added successfully.');
       }
 
+      setError('');
       setFormData({ name: '', quantity: '', price: '' });
       await fetchProducts();
     } catch (error) {
       console.error('Error saving product:', error);
+      setError(error.response?.data?.message || 'Could not save the product.');
     }
   };
 
@@ -95,9 +106,12 @@ function App() {
     try {
       await axios.delete(`${API_URL}/${id}`);
       await fetchProducts();
+      setNotice('Product deleted successfully.');
+      setError('');
       if (editId === id) handleCancelEdit();
     } catch (error) {
       console.error('Error deleting product:', error);
+      setError(error.response?.data?.message || 'Could not delete the product.');
     }
   };
 
@@ -117,16 +131,72 @@ function App() {
     setAccountMenuOpen(false);
   };
 
+  if (page === 'landing') {
+    return (
+      <div className="landing-page">
+        <header className="landing-header">
+          <button className="landing-brand" onClick={() => setPage('landing')} aria-label="StockFlow homepage">
+            <span className="brand-mark">S</span>
+            <span>StockFlow</span>
+          </button>
+          <button className="landing-login" onClick={() => setPage('overview')}>Open dashboard</button>
+        </header>
+
+        <main className="landing-content">
+          <section className="landing-copy">
+            <p className="landing-eyebrow">INVENTORY MADE SIMPLE</p>
+            <h1>Know what is in stock.<br />Act before it runs out.</h1>
+            <p className="landing-subtitle">
+              StockFlow gives you a clear view of your products, stock levels, and inventory value in one place.
+            </p>
+            <div className="landing-actions">
+              <button className="primary-button" onClick={() => setPage('overview')}>View dashboard <span>→</span></button>
+              <button className="secondary-button" onClick={() => setPage('products')}>Manage products</button>
+            </div>
+          </section>
+
+          <section className="landing-preview" aria-label="Inventory preview">
+            <div className="preview-header">
+              <div>
+                <p className="eyebrow">OVERVIEW</p>
+                <h2>Inventory summary</h2>
+              </div>
+              <span className="preview-status">Live</span>
+            </div>
+            <div className="preview-stats">
+              <div><span>Products</span><strong>{loading ? '—' : products.length}</strong></div>
+              <div><span>Units</span><strong>{loading ? '—' : totalUnits}</strong></div>
+              <div><span>Low stock</span><strong>{loading ? '—' : lowStockCount}</strong></div>
+            </div>
+            <div className="preview-products">
+              {loading ? (
+                <p className="empty-state">Loading inventory...</p>
+              ) : products.length === 0 ? (
+                <p className="empty-state">Your inventory is ready for its first product.</p>
+              ) : products.slice(0, 4).map((product) => (
+                <div className="preview-row" key={product._id}>
+                  <div className="product-avatar">{product.name.charAt(0).toUpperCase()}</div>
+                  <strong>{product.name}</strong>
+                  <span>{product.quantity} units</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <button className="brand" onClick={() => setPage('home')} aria-label="Go to homepage">
+        <button className="brand" onClick={() => setPage('landing')} aria-label="Go to homepage">
           <span className="brand-mark">S</span>
           <span>StockFlow</span>
         </button>
 
         <nav className="nav-links" aria-label="Main navigation">
-          <button className={page === 'home' ? 'nav-link active' : 'nav-link'} onClick={() => setPage('home')}>
+          <button className={page === 'overview' ? 'nav-link active' : 'nav-link'} onClick={() => setPage('overview')}>
             <span className="nav-icon">⌂</span> Overview
           </button>
           <button className={page === 'products' ? 'nav-link active' : 'nav-link'} onClick={() => setPage('products')}>
@@ -167,7 +237,13 @@ function App() {
       </aside>
 
       <main className="main-content">
-        {page === 'home' ? (
+        {(notice || error) && (
+          <div className={`app-message ${error ? 'error-message' : ''}`} role={error ? 'alert' : 'status'}>
+            <span>{error || notice}</span>
+            <button type="button" aria-label="Dismiss message" onClick={() => { setNotice(''); setError(''); }}>×</button>
+          </div>
+        )}
+        {page === 'overview' ? (
           <section className="page">
             <div className="page-heading">
               <div>
